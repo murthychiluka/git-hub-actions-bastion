@@ -1,0 +1,46 @@
+name: Deploy via Bastion
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH keys
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.BASTION_SSH_KEY }}" > ~/.ssh/bastion.pem
+          echo "${{ secrets.APP_SSH_KEY }}" > ~/.ssh/app.pem
+          chmod 600 ~/.ssh/bastion.pem ~/.ssh/app.pem
+
+      - name: Configure SSH ProxyJump
+        run: |
+          cat >> ~/.ssh/config << EOF
+          Host bastion
+            HostName ${{ secrets.BASTION_IP }}
+            User ec2-user
+            IdentityFile ~/.ssh/bastion.pem
+            StrictHostKeyChecking no
+
+          Host app
+            HostName ${{ secrets.APP_PRIVATE_IP }}
+            User ec2-user
+            IdentityFile ~/.ssh/app.pem
+            ProxyJump bastion
+            StrictHostKeyChecking no
+          EOF
+
+      - name: Copy app files to server
+        run: |
+          scp -F ~/.ssh/config -r ./app app:/home/ec2-user/
+
+      - name: Deploy and restart app
+        run: |
+          ssh -F ~/.ssh/config app << 'EOF'
+            cd /home/ec2-user/app
+            sudo dnf install -y python3-pip
+            pip3 install -r requirements.txt --break-system-packages
+            sudo systemctl restart myapp || nohup python3 app.py &
+          EOF
