@@ -45,13 +45,24 @@ jobs:
       #       sudo systemctl restart myapp || nohup python3 app.py &
       #     EOF
 
+      # - name: Deploy and restart app
+      #   run: |
+      #     ssh -F ~/.ssh/config app << 'EOF'
+      #       cd /home/ec2-user/app
+      #       sudo dnf install -y python3-pip
+      #       pip3 install -r requirements.txt --break-system-packages
+      #       sudo pkill -f app.py || true
+      #       nohup python3 app.py > /home/ec2-user/app.log 2>&1 </dev/null &
+      #       disown
+      #     EOF
       - name: Deploy and restart app
         run: |
-          ssh -F ~/.ssh/config app << 'EOF'
+          timeout 60 ssh -F ~/.ssh/config -o BatchMode=yes app << 'EOF'
             cd /home/ec2-user/app
-            sudo dnf install -y python3-pip
-            pip3 install -r requirements.txt --break-system-packages
+            sudo dnf install -y python3-pip -q
+            pip3 install -r requirements.txt --break-system-packages -q
             sudo pkill -f app.py || true
-            nohup python3 app.py > /home/ec2-user/app.log 2>&1 </dev/null &
-            disown
+            sleep 1
+            setsid nohup python3 app.py > /home/ec2-user/app.log 2>&1 < /dev/null &
+            exit 0
           EOF
