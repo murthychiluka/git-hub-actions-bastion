@@ -36,11 +36,22 @@ jobs:
         run: |
           scp -F ~/.ssh/config -r ./app app:/home/ec2-user/
 
+      # - name: Deploy and restart app
+      #   run: |
+      #     ssh -F ~/.ssh/config app << 'EOF'
+      #       cd /home/ec2-user/app
+      #       sudo dnf install -y python3-pip
+      #       pip3 install -r requirements.txt --break-system-packages
+      #       sudo systemctl restart myapp || nohup python3 app.py &
+      #     EOF
+
       - name: Deploy and restart app
         run: |
           ssh -F ~/.ssh/config app << 'EOF'
             cd /home/ec2-user/app
             sudo dnf install -y python3-pip
             pip3 install -r requirements.txt --break-system-packages
-            sudo systemctl restart myapp || nohup python3 app.py &
+            sudo pkill -f app.py || true
+            nohup python3 app.py > /home/ec2-user/app.log 2>&1 </dev/null &
+            disown
           EOF
